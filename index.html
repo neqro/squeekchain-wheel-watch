@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Squeektoshi Wheel Watch · Squeekchain dashboard</title>
+<meta name="description" content="Live community dashboard for Squeekchain: Squeektoshi's wheel, Squeek blocks, $SQK supply, records and an account lookup. Built on the public Squeekchain API.">
+<style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--txt:#e9e6df;--mut:#8d93a1;--acc:#f4b942;--ok:#52d273;--warn:#e8a33d;--bad:#e5534b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:28px 20px 8px;max-width:1100px;margin:auto;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+h1{margin:0;font-size:26px;letter-spacing:.3px}h1 span{color:var(--acc)}
+.sub{color:var(--mut);font-size:13px}
+main{max-width:1100px;margin:auto;padding:12px 20px 40px;display:grid;gap:14px;grid-template-columns:repeat(12,1fr)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.c4{grid-column:span 4}.c6{grid-column:span 6}.c8{grid-column:span 8}.c12{grid-column:span 12}
+@media(max-width:860px){.c4,.c6,.c8{grid-column:span 12}}
+.k{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.8px}
+.v{font-size:30px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+.v small{font-size:14px;color:var(--mut);font-weight:500}
+.row{display:flex;gap:18px;flex-wrap:wrap}.row>div{min-width:120px}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);font-weight:600}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--mut)}
+.run .dot{background:var(--ok);box-shadow:0 0 0 0 rgba(82,210,115,.6);animation:p 1.4s infinite}
+@keyframes p{70%{box-shadow:0 0 0 10px rgba(82,210,115,0)}100%{box-shadow:0 0 0 0 rgba(82,210,115,0)}}
+.bar{height:12px;background:#0c0e12;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#c98a1c,var(--acc));width:0;transition:width .8s}
+.wheel{width:84px;height:84px}.spin{animation:s linear infinite}@keyframes s{to{transform:rotate(360deg)}}
+table{width:100%;border-collapse:collapse;font-size:14px}td{padding:7px 4px;border-bottom:1px solid var(--line)}td:last-child{text-align:right;color:var(--mut)}
+.feed{max-height:330px;overflow:auto}
+input{background:#0c0e12;border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px 12px;width:100%;font:inherit}
+button{background:var(--acc);color:#1a1405;border:0;border-radius:10px;padding:10px 16px;font-weight:700;cursor:pointer}
+.err{color:var(--bad)}.mut{color:var(--mut)}a{color:var(--acc)}
+footer{max-width:1100px;margin:auto;padding:0 20px 30px;color:var(--mut);font-size:12px}
+svg text{fill:var(--mut);font-size:10px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🐹 Squeektoshi <span>Wheel Watch</span></h1>
+    <div class="sub">Live community dashboard for <a href="https://squeekchain.com" target="_blank" rel="noopener">Squeekchain</a>, the hamster-powered proof-of-work toychain on Ethereum (Sepolia).</div>
+  </div>
+  <div id="statusPill" class="pill"><span class="dot"></span><span id="statusTxt">Connecting…</span></div>
+</header>
+
+<main>
+  <section class="card c4">
+    <div class="row" style="align-items:center">
+      <svg class="wheel" id="wheel" viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#f4b942" stroke-width="5"/><g stroke="#8d93a1" stroke-width="3"><line x1="50" y1="8" x2="50" y2="92"/><line x1="8" y1="50" x2="92" y2="50"/><line x1="20" y1="20" x2="80" y2="80"/><line x1="80" y1="20" x2="20" y2="80"/></g><circle cx="50" cy="50" r="7" fill="#f4b942"/></svg>
+      <div><div class="k">Wheel speed</div><div class="v" id="speed">–<small> km/h</small></div><div class="mut" id="rpm">– rpm</div></div>
+    </div>
+  </section>
+  <section class="card c4"><div class="k">Distance today (UTC noon–noon)</div><div class="v" id="today">–<small> km</small></div><div class="mut" id="lifetime">Lifetime: – km</div></section>
+  <section class="card c4"><div class="k">Settled work units</div><div class="v" id="work">–</div><div class="mut" id="queued">Queued: –</div></section>
+
+  <section class="card c8">
+    <div class="k">Squeek block height</div>
+    <div class="v" id="height">–</div>
+    <div class="bar" style="margin:10px 0 6px"><i id="prog"></i></div>
+    <div class="mut" id="progTxt">Progress to next block: –</div>
+    <div class="mut" id="diff">Difficulty: – work per 1,000 blocks</div>
+  </section>
+  <section class="card c4"><div class="k">$SQK live supply</div><div class="v" id="supply">–</div><div class="bar" style="margin:10px 0 6px"><i id="capBar"></i></div><div class="mut" id="capTxt">of 2.1B cap</div><div class="mut" id="mined">Mined by the wheel: –</div></section>
+
+  <section class="card c8">
+    <div class="k">Last 7 days · work units per day</div>
+    <svg id="chart" viewBox="0 0 700 220" width="100%" height="220"></svg>
+  </section>
+  <section class="card c4">
+    <div class="k">Records (7d window)</div>
+    <table id="records"><tr><td class="mut">Loading…</td><td></td></tr></table>
+  </section>
+
+  <section class="card c6">
+    <div class="k">Squeeks (NFTs)</div>
+    <div class="row" style="margin-top:8px">
+      <div><div class="v" id="nftLive">–</div><div class="mut">live</div></div>
+      <div><div class="v" id="nftBurn">–</div><div class="mut">burned in merges</div></div>
+      <div><div class="v" id="stakers">–</div><div class="mut">total NFT power</div></div>
+    </div>
+    <div class="mut" id="stage" style="margin-top:8px">Mining stage: –</div>
+  </section>
+  <section class="card c6">
+    <div class="k">Account lookup</div>
+    <div style="display:flex;gap:8px;margin-top:8px"><input id="addr" placeholder="0x… wallet address"><button id="go">Check</button></div>
+    <div id="acct" class="mut" style="margin-top:10px">Squeeks held or staked, power and claimable $SQK.</div>
+  </section>
+
+  <section class="card c12">
+    <div class="k">Live activity</div>
+    <table class="feed" id="feed"><tr><td class="mut">Loading…</td><td></td></tr></table>
+  </section>
+</main>
+<footer>
+  Data: public <a href="https://docs.squeekchain.com/developers/api/" target="_blank" rel="noopener">Squeekchain API</a> (api.squeekchain.com/v1). Chain values are read 12 blocks behind the tip; "unavailable" means unknown, not zero. Unofficial community build by <a href="https://x.com/neqro_61" target="_blank" rel="noopener">@neqro_61</a>. Not financial advice.
+</footer>
+
+<script>
+const API='https://api.squeekchain.com/v1';
+const $=id=>document.getElementById(id);
+const fmt=(n,d=0)=>Number(n).toLocaleString('en-US',{maximumFractionDigits:d,minimumFractionDigits:d});
+const sqk=b=>Number(BigInt(b)/10n**12n)/1e6; // base units -> SQK
+const big=n=>n>=1e9?fmt(n/1e9,2)+'B':n>=1e6?fmt(n/1e6,2)+'M':n>=1e3?fmt(n/1e3,1)+'K':fmt(n,2);
+const ago=t=>{const s=(Date.now()-new Date(t))/1000;return s<60?Math.round(s)+'s ago':s<3600?Math.round(s/60)+'m ago':s<86400?Math.round(s/3600)+'h ago':Math.round(s/86400)+'d ago'};
+const short=a=>a?a.slice(0,6)+'…'+a.slice(-4):'';
+async function get(p){for(let i=0;i<3;i++){const r=await fetch(API+p,{headers:{accept:'application/json'}});if(r.status===429||r.status===503){await new Promise(x=>setTimeout(x,1000*Number(r.headers.get('retry-after')||2)));continue;}if(!r.ok)throw new Error(p+' '+r.status);return r.json();}throw new Error(p+' busy');}
+
+async function status(){
+  try{
+    const d=await get('/status'),m=d.measurement,b=d.builder;
+    if(m){
+      const running=m.coreStatus==='ACTIVE'||m.rpmMilli>0, online=m.freshness==='online';
+      $('statusPill').className='pill'+(running?' run':'');
+      $('statusTxt').textContent=!online?'Device offline':running?'Squeektoshi is running!':'Wheel idle (resting)';
+      $('speed').innerHTML=fmt(m.speedMmPerSecond*0.0036,2)+'<small> km/h</small>';
+      $('rpm').textContent=fmt(m.rpmMilli/1000,1)+' rpm';
+      $('today').innerHTML=fmt(m.distanceMm/1e6,2)+'<small> km</small>';
+      const w=$('wheel');if(m.rpmMilli>0){w.classList.add('spin');w.style.animationDuration=Math.max(.2,60000/m.rpmMilli)+'s'}else w.classList.remove('spin');
+    }
+    if(b&&b.status==='available'){
+      const a=b.anchor,p=b.projected;
+      $('work').textContent=fmt(a.cumulativeWork);
+      $('queued').textContent='Queued (unsettled): '+fmt(Number(b.queued.closedWorkUnits)+Number(b.queued.openRoundWorkUnits))+' work · projected height '+fmt(p.blockHeight);
+      $('height').textContent='#'+fmt(a.blockHeight);
+      const pr=Number(a.blockProgress)/1e7;$('prog').style.width=pr+'%';
+      $('progTxt').textContent='Progress to block #'+fmt(Number(a.blockHeight)+1)+': '+fmt(pr,1)+'% · settled round '+a.settledThroughRound+' · '+ago(a.confirmedAt);
+      $('diff').textContent='Difficulty: '+fmt(a.workPerThousandBlocks)+' work per 1,000 blocks (≈'+fmt(Number(a.workPerThousandBlocks)/1000,2)+' wheel passes per block)';
+    }
+  }catch(e){$('statusTxt').textContent='API unavailable';}
+}
+
+async function stats(){
+  try{
+    const d=await get('/measurement/stats?range=7d');
+    $('lifetime').textContent='Lifetime: '+fmt(Number(d.lifetime.observedDistanceMm)/1e6,2)+' km over '+d.lifetime.activeDayCount+' active days';
+    const days=d.activity.days,max=Math.max(1,...days.map(x=>Number(x.observedWorkUnits)));
+    let s='',bw=700/days.length;
+    days.forEach((x,i)=>{const v=Number(x.observedWorkUnits),h=v/max*165,X=i*bw+12;
+      s+=`<rect x="${X}" y="${185-h}" width="${bw-24}" height="${h}" rx="6" fill="#f4b942" opacity="${v?1:.25}"><title>${x.date}: ${fmt(v)} work, ${x.distanceMm?fmt(x.distanceMm/1e6,2)+' km':'n/a'}</title></rect>`;
+      s+=`<text x="${X+(bw-24)/2}" y="205" text-anchor="middle">${x.date.slice(5)}</text><text x="${X+(bw-24)/2}" y="${180-h}" text-anchor="middle">${v?fmt(v):''}</text>`;});
+    $('chart').innerHTML=s;
+    const r=d.records,row=(k,v)=>`<tr><td>${k}</td><td>${v}</td></tr>`,val=o=>o?o.value:null;
+    $('records').innerHTML=
+      row('Top speed',val(r.peakObservedSpeedMmPerSecond)?fmt(val(r.peakObservedSpeedMmPerSecond)*0.0036,2)+' km/h':'–')+
+      row('Peak rpm',val(r.peakObservedRpmMilli)?fmt(val(r.peakObservedRpmMilli)/1000,1):'–')+
+      row('Best day distance',val(r.maximumDailyDistanceMm)?fmt(val(r.maximumDailyDistanceMm)/1e6,2)+' km':'–')+
+      row('Most work in a day',val(r.mostWorkUtcDay)?fmt(val(r.mostWorkUtcDay)):'–')+
+      row('Longest run',val(r.longestActiveWindowMinutes)?val(r.longestActiveWindowMinutes)+' min':'–')+
+      row('Active-day streak',val(r.longestActiveDayStreak)?val(r.longestActiveDayStreak)+' days':'–');
+  }catch(e){$('records').innerHTML='<tr><td class="err">Stats unavailable right now</td><td></td></tr>'}
+}
+
+async function economy(){
+  try{
+    const d=await get('/economy/state');if(d.status!=='available')return;
+    const s=d.supply;if(s){const live=sqk(s.liveSupplyBaseUnits),cap=sqk(s.capBaseUnits);
+      $('supply').textContent=big(live);$('capBar').style.width=(live/cap*100)+'%';
+      $('capTxt').textContent=fmt(live/cap*100,2)+'% of '+big(cap)+' cap';
+      $('mined').textContent='Mined by the wheel: '+big(sqk(s.miningMintedBaseUnits))+' SQK · burned '+big(sqk(s.totalBurnedBaseUnits));}
+    if(d.nft){$('nftLive').textContent=fmt(d.nft.live);$('nftBurn').textContent=fmt(d.nft.burned);}
+    if(d.staking&&d.staking.totalNftPower)$('stakers').textContent=big(Number(d.staking.totalNftPower));
+    if(d.lifecycle)$('stage').textContent='Mining stage: '+d.lifecycle.stage+(d.lifecycle.paused?' (paused)':'')+' · round '+d.lifecycle.currentRound;
+  }catch(e){}
+}
+
+const label={'system.settlement_completed':p=>`⛓️ Settlement: +${fmt(p.workAdded)} work, height ${fmt(p.blockHeight)}`,
+ 'system.mining_checkpointed':p=>`⛏️ Checkpoint: ${fmt(p.completedBlockCount)} blocks → ${big(sqk(p.amountBaseUnits))} SQK`,
+ 'account.rewards_claimed':p=>`💰 ${short(p.account)} claimed ${big(sqk(p.amountBaseUnits))} SQK`,
+ 'account.rewards_staked':p=>`🔁 ${short(p.account)} compounded ${big(sqk(p.amountBaseUnits))} SQK`,
+ 'account.sqk_staked':p=>`📥 ${short(p.account)} staked ${big(sqk(p.amountBaseUnits))} SQK`,
+ 'account.sqk_unstaked':p=>`📤 ${short(p.account)} unstaked ${big(sqk(p.amountBaseUnits))} SQK (fee ${big(sqk(p.feeBaseUnits))})`,
+ 'nft.deposited':p=>`🐹 ${short(p.account)} deposited Squeek #${p.tokenId}`,
+ 'nft.withdrawn':p=>`↩️ ${short(p.account)} withdrew Squeek #${p.tokenId}`,
+ 'nft.merged':p=>`✨ ${short(p.account)} merged #${p.donorTokenId} into #${p.survivorTokenId} → level ${p.level}`,
+ 'measurement.distance_milestone':p=>`🏁 Lifetime distance passed ${fmt(p.thresholdDistanceMm/1e6)} km`,
+ 'measurement.daily_distance_milestone':p=>`📏 ${fmt(p.thresholdDistanceMm/1e6)} km in one day`,
+ 'measurement.speed_milestone':p=>`⚡ Speed milestone ${fmt(p.thresholdSpeedMmPerSecond*0.0036,1)} km/h`,
+ 'measurement.speed_record':p=>`🏆 New speed record ${fmt(p.recordMmPerSecond*0.0036,2)} km/h`,
+ 'measurement.distance_streak':p=>`🔥 ${p.days}-day 5 km streak`};
+async function feed(){
+  try{const d=await get('/events?limit=25');if(d.status!=='available')return;
+    $('feed').innerHTML=d.events.map(e=>`<tr><td>${(label[e.type]||(()=>e.type))(e.payload)}</td><td>${ago(e.occurredAt)}</td></tr>`).join('');
+  }catch(e){}
+}
+
+$('go').onclick=async()=>{
+  const a=$('addr').value.trim();const out=$('acct');
+  if(!/^0x[0-9a-fA-F]{40}$/.test(a)){out.innerHTML='<span class="err">Enter a valid 0x address.</span>';return}
+  out.textContent='Looking up…';
+  try{const d=await get('/accounts/'+a.toLowerCase()+'?limit=100');
+    if(d.status!=='available'){out.textContent='Account data unavailable ('+d.reason+').';return}
+    const tc=d.tokenCounts||{},lv=(d.tokens||[]).map(t=>'#'+t.tokenId+' L'+t.level+(t.custody==='staking'?' (staked)':'')).join(', ');
+    out.innerHTML=`<b>${fmt(Number(tc.wallet||0))}</b> in wallet · <b>${fmt(Number(tc.staking||0))}</b> staked<br>`+
+      (d.rewards?`Claimable: <b>${fmt(sqk(d.rewards.claimableBaseUnits),2)} SQK</b> · lifetime claimed ${big(sqk(d.rewards.lifetimePaidBaseUnits))}<br>`:'')+
+      (d.power?`Power: NFT ${big(Number(d.power.nftPower))} · SQK ${big(Number(d.power.sqkPower))}<br>`:'')+
+      (lv?`<span class="mut">${lv}</span>`:'<span class="mut">No Squeeks on this address.</span>');
+  }catch(e){out.innerHTML='<span class="err">Lookup failed, try again in a moment.</span>'}
+};
+
+status();stats();economy();feed();
+setInterval(status,5000);setInterval(feed,15000);setInterval(economy,30000);setInterval(stats,120000);
+</script>
+</body>
+</html>
